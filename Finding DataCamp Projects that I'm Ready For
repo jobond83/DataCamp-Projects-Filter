@@ -1,0 +1,79 @@
+#Exploratory code for the page
+#Define the Python project page and parse the soup
+import requests
+from bs4 import BeautifulSoup
+page = requests.get('https://www.datacamp.com/projects/tech:python/from_search:true')
+soup = BeautifulSoup(page.content, 'html.parser')
+
+
+#Finding all of the links on the page
+proj_href = []
+for a in soup.find_all('a', href=True):
+    proj_href.append(a['href'])
+#Filtering for just the url tails that lead to projects
+proj_href_filter = [k for k in proj_href if '/projects/' in k]
+proj_url_list = [i for i in proj_href_filter if 'topic' not in i]
+
+
+#Finding all of the associated Python project titles
+proj_title_list = []
+filt = 'dc-project-block__title'
+for b in soup.find_all('h5', filt):    
+    proj_title_list.append(b.get_text())
+
+    
+#Create a dataframe that associates project title with sub url and adds the base url from the website
+import pandas as pd
+projects = pd.DataFrame({'proj_title':proj_title_list, 'proj_url':proj_url_list})
+base_url = 'https://www.datacamp.com'
+projects['proj_url'] = base_url + projects['proj_url']
+
+
+#Create a dictionary of courses for each project...page and soup are redefined inside the loop here
+proj_url = projects['proj_url']
+proj_title = projects['proj_title']
+proj_dict = {}
+
+for p in proj_url:
+    reqs_list = []
+    page2 = requests.get(p)                                  #requests page information for the keys
+    soup2 = BeautifulSoup(page2.content, 'html.parser')      #parses the page for content
+    for a in soup2.find_all('a', href=True):                 #creates a list of all hyperlinks on page
+        reqs_list.append(a['href'])
+    reqs_list = [r for r in reqs_list if '/courses/' in r]   #filters for hyperlinks that are courses
+    reqs_list = [s[33:] for s in reqs_list]                  #removes the html tag data from the hyperlink
+    reqs_list = [t.replace('-', ' ') for t in reqs_list]     #takes our url '-' to make prereqs human readable
+    proj_dict.update({p:reqs_list})                          #creates key/value for dictionary
+    
+    
+#Rename keys from project urls to the project titles
+proj_dict = dict(zip(proj_title, proj_dict.values()))
+
+
+#list of completed DataCamp Courses (customize to your status) (maybe automate soon?)
+completed_course = ['introduction to python',
+                    'intermediate python for data science',
+                    'python data science toolbox part 1',
+                    'python data science toolbox part 2',
+                    'pandas foundations',
+                    'importing data in python part 1',
+                    'importing data in python part 2',
+                    'cleaning data in python']
+#list of completed DataCamp Projects (customize to your status) (maybe automate soon?)
+completed_project = ['Introduction to DataCamp Projects',
+                     'Generating Keywords for Google Ads',
+                     'TV, Halftime Shows, and the Big Game']
+
+
+#filter for project titles based on all prereqs existing in completed course list
+qualified_project = []
+for key in proj_dict:
+    result = all(elem in completed_course for elem in proj_dict[key])  #filter keys that have all completed values
+    if result is True:   
+        qualified_project.append(key)
+qualified_project
+
+
+#remove completed projects
+available_project = [proj for proj in qualified_project if proj not in completed_project]
+available_project
